@@ -1,0 +1,4 @@
+2025-06-01 20:56:19,238 - App.core.config - INFO - Settings loaded successfully
+2025-06-01 20:56:20,925 - App.core.config - INFO - Settings loaded successfully
+2025-06-01 20:56:24,119 - App.api.routes - ERROR - Course narration failed: name 'create_course' is not defined
+2025-06-01 20:56:26,175 - App.api.routes - ERROR - Course narration failed: name 'create_course' is not defined

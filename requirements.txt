@@ -1,0 +1,12 @@
+pydub
+soundfile
+numpy
+gtts
+speechrecognition
+httpx
+python-multipart
+python-dotenv
+fastapi
+uvicorn
+tenacity>=8.0.0
+aiofiles>=0.8.0
