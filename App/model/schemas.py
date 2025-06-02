@@ -52,8 +52,6 @@ class CourseResponse(BaseModel):
 
 class CourseRequest(BaseModel):
     topic: str
-    difficulty: str = "intermediate"
-    duration_weeks: int = 3
 
 # Chat and Speech-related schemas
 class ChatMessage(BaseModel):

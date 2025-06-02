@@ -1,7 +1,7 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends
 from fastapi.responses import FileResponse
-import os  # Add this import
-from App.services.quiz_generator import quiz_generator  # Import singleton instance
+import os
+from App.services.quiz_generator import quiz_generator  
 from App.model.schemas import PromptRequest, QuizResponse
 from App.model.schemas import (
     CourseRequest, 
@@ -20,7 +20,7 @@ import httpx
 from datetime import datetime
 from pathlib import Path
 import logging
-
+from App.services.quiz_generator import QuizGenerator
 router = APIRouter()
 
 # Initialize services
@@ -30,6 +30,14 @@ speech_service = SpeechService()
 chat_service = ChatService()
 
 logger = logging.getLogger(__name__)
+
+def get_llm_service():
+    """Dependency to get LLM service instance"""
+    return llm_service
+
+def get_quiz_generator(llm_service: LLMService = Depends(get_llm_service)):
+    """Dependency to get QuizGenerator instance"""
+    return QuizGenerator(llm_service)
 
 @router.post("/Course-Generation/")
 async def narrate_course(
@@ -43,8 +51,6 @@ async def narrate_course(
         # Generate course content directly using course generator
         course_response = await course_generator.generate_course(
             topic=request.topic,
-            difficulty=request.difficulty,
-            duration_weeks=request.duration_weeks,
             language=language
         )
 
@@ -96,22 +102,22 @@ async def narrate_course(
             detail=f"Failed to generate and narrate course: {str(e)}"
         )
 
-
-@router.post("/generate_quiz/", response_model=QuizResponse)
-async def create_quiz(prompt_request: PromptRequest):
-    """Generate a quiz from text prompt"""
+@router.post("/generate-quiz", response_model=QuizResponse)
+async def generate_quiz(
+    course_content: CourseResponse,
+    language: str = Query(default=settings.DEFAULT_LANGUAGE, enum=settings.SUPPORTED_LANGUAGES),
+    quiz_generator: QuizGenerator = Depends(get_quiz_generator)
+):
+    """
+    Generate a quiz based on course content
+    """
     try:
-        quiz_response = await quiz_generator.generate_quiz(
-            prompt=prompt_request.prompt,
-            language=prompt_request.language
-        )
-        return quiz_response
-    except ValueError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return await quiz_generator.generate_quiz(course_content, language)
     except Exception as e:
+        logger.error(f"Error in generate_quiz endpoint: {str(e)}")
         raise HTTPException(
-            status_code=500, 
-            detail=f"An unexpected error occurred: {str(e)}"
+            status_code=500,
+            detail=f"Failed to generate quiz: {str(e)}"
         )
 
 @router.post("/chat/", response_model=ChatResponse)

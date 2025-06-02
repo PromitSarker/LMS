@@ -56,13 +56,13 @@ class CourseGenerator:
             {"role": "user", "content": prompt}
         ]
 
-    async def generate_course(self, topic: str, difficulty: str, duration_weeks: int, language: str = None) -> CourseResponse:
+    async def generate_course(self, topic: str,  language: str = None) -> CourseResponse:
         try:
             if language and language not in settings.SUPPORTED_LANGUAGES:
                 logger.warning(f"Unsupported language: {language}. Falling back to {self.default_language}")
                 language = self.default_language
 
-            prompt = self._create_prompt(topic, difficulty, duration_weeks, language)
+            prompt = self._create_prompt(topic, language)
             messages = self._create_messages(prompt)
             response = await self.llm_service.generate_completion(messages)
             content = response['choices'][0]['message']['content']
@@ -97,7 +97,7 @@ class CourseGenerator:
                 if not all(key in subtopic for key in ["title", "content_blocks", "examples"]):
                     raise ValueError(f"Module {i} subtopic {j} missing required fields")
 
-    def _create_prompt(self, topic: str, difficulty: str, duration_weeks: int, language: str = None) -> str:
+    def _create_prompt(self, topic: str,  language: str = None) -> str:
         lang = language if language in settings.SUPPORTED_LANGUAGES else self.default_language
 
         language_names = {
@@ -106,17 +106,17 @@ class CourseGenerator:
         }
 
         base_prompts = {
-            "en": f"Generate a professional workplace training course on {topic} at the {difficulty} level.",
-            "es": f"Genera un curso de capacitación profesional sobre {topic} de nivel {difficulty}.",
-            "fr": f"Générer un cours de formation professionnelle sur {topic} au niveau {difficulty}.",
-            "de": f"Erstellen Sie einen {difficulty} Level {duration_weeks}-wöchigen Kurs über {topic}. Generieren Sie ALLE Inhalte auf Deutsch.",
-            "zh": f"创建一个{difficulty}级别的{duration_weeks}周{topic}课程。生成所有内容时请使用中文。",
-            "bn": f"{topic} এর উপর {difficulty} স্তরের {duration_weeks} সপ্তাহের কোর্স তৈরি করুন। সমস্ত কনটেন্ট বাংলায় তৈরি করুন।",
-            "hi": f"{topic} पर {difficulty} स्तर का {duration_weeks} सप्ताह का पाठ्यक्रम बनाएं। सभी सामग्री हिंदी में उत्पन्न करें।",
-            "ko": f"{topic}에 대한 {difficulty} 수준의 {duration_weeks}주 과정 생성. 모든 콘텐츠를 한국어로 생성하세요.",
-            "fa": f"{topic} در سطح {difficulty} دوره {duration_weeks} هفته ای ایجاد کنید. تمام محتوا را به فارسی تولید کنید.",
-            "vi": f"Tạo khóa học {difficulty} {duration_weeks} tuần về {topic}. Tạo TẤT CẢ nội dung bằng tiếng Việt.",
-            "tl": f"Lumikha ng {difficulty} na antas na {duration_weeks} linggong kurso sa {topic}. Lumikha ng LAHAT ng nilalaman sa Tagalog."
+            "en": f"Create a 3-week intermediate level course on {topic}.",
+            "es": f"Crea un curso de 3 semanas de nivel intermediate sobre {topic}.",
+            "fr": f"Créez un cours de 3 semaines de niveau intermediate sur {topic}.",
+            "de": f"Erstellen Sie einen 3-wöchigen intermediate Kurs über {topic}.",
+            "zh": f"创建一个关于{topic}的intermediate级别的3周课程。",
+            "bn": f"{topic} এর উপর intermediate স্তরের 3 সপ্তাহের কোর্স তৈরি করুন। সমস্ত কনটেন্ট বাংলায় তৈরি করুন।",
+            "hi": f"{topic} पर intermediate स्तर का 3 सप्ताह का पाठ्यक्रम बनाएं। सभी सामग्री हिंदी में उत्पन्न करें।",
+            "ko": f"{topic}에 대한 intermediate 수준의 3주 과정 생성. 모든 콘텐츠를 한국어로 생성하세요.",
+            "fa": f"{topic} در سطح intermediate دوره 3 هفته ای ایجاد کنید. تمام محتوا را به فارسی تولید کنید.",
+            "vi": f"Tạo khóa học intermediate 3 tuần về {topic}. Tạo TẤT CẢ nội dung bằng tiếng Việt.",
+            "tl": f"Lumikha ng intermediate na antas na 3 linggong kurso sa {topic}. Lumikha ng LAHAT ng nilalaman sa Tagalog."
         }
 
         system_instructions = {
