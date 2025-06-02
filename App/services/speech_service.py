@@ -51,11 +51,17 @@ class SpeechService:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=10)
     )
-    async def text_to_speech(self, text: str, language: str = None) -> str:
+    async def text_to_speech(self, text: str, language: str = None, custom_filename: str = None) -> str:
         """Convert text to speech with retry logic"""
         try:
             lang = language if language in settings.SUPPORTED_LANGUAGES else settings.DEFAULT_LANGUAGE
-            filename = f"tts_{hash(text)}_{lang}.mp3"
+            
+            # Use custom filename if provided, otherwise use hash
+            if custom_filename:
+                filename = f"{custom_filename}_{lang}.mp3"
+            else:
+                filename = f"tts_{hash(text)}_{lang}.mp3"
+                
             filepath = self.tts_dir / filename
             
             if not filepath.exists():
@@ -250,15 +256,18 @@ Learning Objectives:
                                   title: str, language: str = None) -> str:
         """Generate audio file for a single module"""
         try:
-            module_filename = f"module_{module_idx}_{self.sanitize_filename(title)}.mp3"
-            module_filepath = self.tts_dir / module_filename
-
-            if not module_filepath.exists():
-                logger.info(f"Generating audio for module {module_idx}: {title}")
-                audio_path = await self.text_to_speech(module_content, language)
-                return audio_path
+            # Create standardized filename
+            safe_title = self.sanitize_filename(title)
+            module_filename = f"module_{module_idx}_{safe_title}"
             
-            return str(module_filepath)
+            # Generate audio with custom filename
+            audio_path = await self.text_to_speech(
+                text=module_content,
+                language=language,
+                custom_filename=module_filename
+            )
+            
+            return audio_path
 
         except Exception as e:
             error_msg = f"Failed to generate module audio: {str(e)}"
@@ -268,7 +277,7 @@ Learning Objectives:
     async def create_course_audio(self, course_response: CourseResponse, language: str = None) -> Dict[str, Any]:
         """Create separate audio files for each module in the course"""
         try:
-            # Format course introduction
+            # Format and generate intro audio
             intro_text = f"""Welcome to {course_response.course_title}.
             
 Course Description:
@@ -277,17 +286,24 @@ Course Description:
 Learning Objectives:
 {'. '.join(f'Objective {i+1}: {obj}' for i, obj in enumerate(course_response.learning_objectives, 1))}
 """
-            # Generate intro audio
-            intro_audio_path = await self.text_to_speech(intro_text, language)
+            intro_filename = f"intro_{self.sanitize_filename(course_response.course_title)}"
+            intro_audio_path = await self.text_to_speech(
+                text=intro_text,
+                language=language,
+                custom_filename=intro_filename
+            )
             
             # Generate audio for each module
             module_audios = []
             for idx, module in enumerate(course_response.modules, 1):
-                # Format module content
                 module_text = await self._format_module_content(idx, module)
+                module_filename = f"module_{idx}_{self.sanitize_filename(module.title)}"
                 
-                # Generate audio for this module
-                module_audio_path = await self.text_to_speech(module_text, language)
+                module_audio_path = await self.text_to_speech(
+                    text=module_text,
+                    language=language,
+                    custom_filename=module_filename
+                )
                 
                 module_audios.append({
                     "module_number": idx,
