@@ -60,10 +60,6 @@ class ChatMessage(BaseModel):
 class ChatResponse(BaseModel):
     response: str
 
-class SpeechToTextResponse(BaseModel):
-    text: str
-    detected_language: str
-
 class TextToSpeechRequest(BaseModel):
     text: str
     language: str = "en"

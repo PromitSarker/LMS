@@ -35,14 +35,13 @@ class SpeechService:
         self.recognizer = sr.Recognizer()
         self.api_key = settings.GROQ_API_KEY
         self.base_url = settings.GROQ_API_URL
-        self.model = settings.SPEECH_TO_TEXT_MODEL
+
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
         
         # Update model reference
-        self.speech_model = settings.SPEECH_TO_TEXT_MODEL
         self.max_audio_duration = 30  # maximum duration in seconds
         self.target_sample_rate = 16000  # lower sample rate for smaller file size
 
@@ -109,120 +108,6 @@ class SpeechService:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=10)
     )
-    async def speech_to_text(self, audio_file: UploadFile) -> Tuple[str, str]:
-        """Convert speech to text using Groq AI with audio size optimization"""
-        try:
-            content = await audio_file.read()
-            
-            # Preprocess audio to reduce size
-            processed_audio = await self.preprocess_audio(content)
-            
-            # Convert to base64 with size check
-            audio_base64 = base64.b64encode(processed_audio).decode('utf-8')
-            
-            # Estimate token size (rough estimation)
-            estimated_tokens = len(audio_base64) / 3  # approximate tokens per base64 chunk
-            
-            if estimated_tokens > settings.SPEECH_MAX_TOKENS:
-                raise HTTPException(
-                    status_code=413,
-                    detail="Audio file too large. Please limit recording to 30 seconds or less."
-                )
-
-            # Create a prompt for transcription
-            messages = [
-                {
-                    "role": "system",
-                    "content": "You are an expert at transcribing audio. Extract the speech content accurately."
-                },
-                {
-                    "role": "user",
-                    "content": f"Transcribe this audio: {audio_base64}"
-                }
-            ]
-
-            # Make request to Groq AI with increased timeout
-            async with httpx.AsyncClient(timeout=90.0) as client:
-                response = await client.post(
-                    self.base_url,
-                    headers=self.headers,
-                    json={
-                        "model": self.speech_model,
-                        "messages": messages,
-                        "temperature": settings.SPEECH_TEMPERATURE,
-                        "max_tokens": settings.SPEECH_MAX_TOKENS
-                    }
-                )
-
-                if response.status_code != 200:
-                    raise HTTPException(
-                        status_code=response.status_code,
-                        detail=f"Groq API error: {response.text}"
-                    )
-
-                result = response.json()
-                transcription = result["choices"][0]["message"]["content"]
-
-                # Detect language
-                lang_messages = [
-                    {
-                        "role": "system",
-                        "content": "You are a language detection expert. Reply only with the ISO 639-1 language code."
-                    },
-                    {
-                        "role": "user",
-                        "content": f"What is the language code for this text: {transcription}"
-                    }
-                ]
-
-                lang_response = await client.post(
-                    self.base_url,
-                    headers=self.headers,
-                    json={
-                        "model": self.speech_model,
-                        "messages": lang_messages,
-                        "temperature": 0.1,
-                        "max_tokens": 2
-                    }
-                )
-
-                if lang_response.status_code != 200:
-                    detected_lang = settings.DEFAULT_LANGUAGE
-                else:
-                    detected_lang = lang_response.json()["choices"][0]["message"]["content"].strip()
-
-                logger.info(f"Transcribed audio to text. Detected language: {detected_lang}")
-                return transcription.strip(), detected_lang
-
-        except HTTPException as he:
-            raise he
-        except Exception as e:
-            error_msg = f"Speech-to-text conversion failed: {str(e)}"
-            logger.error(error_msg)
-            raise HTTPException(status_code=500, detail=error_msg)
-
-    async def record_audio(self, duration: int = 5) -> Optional[str]:
-        """Record audio from microphone"""
-        try:
-            with sr.Microphone() as source:
-                logger.info("Recording audio...")
-                self.recognizer.adjust_for_ambient_noise(source, duration=1)
-                audio = self.recognizer.listen(source, timeout=duration)
-                
-                # Save audio to recordings directory
-                filename = f"recording_{int(time.time())}.wav"
-                filepath = self.recordings_dir / filename
-                
-                with open(filepath, 'wb') as f:
-                    f.write(audio.get_wav_data())
-                    
-                logger.info(f"Saved recording to {filepath}")
-                return str(filepath)
-                    
-        except Exception as e:
-            error_msg = f"Audio recording failed: {str(e)}"
-            logger.error(error_msg)
-            raise HTTPException(status_code=500, detail=error_msg)
 
     def sanitize_filename(self, text: str) -> str:
         return re.sub(r'[^a-zA-Z0-9_\-]', '_', text.strip().replace(' ', '_'))[:50]
